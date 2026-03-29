@@ -25,8 +25,14 @@ from core.state import (
     GraphState,
     TaskStatus,
 )
+from integrations.teams import TeamsClient
+from integrations.n8n_bridge import N8nBridge
 
 logger = logging.getLogger(__name__)
+
+# Shared integration clients
+_teams = TeamsClient()
+_n8n = N8nBridge()
 
 # Shared instances (stateless, safe to reuse)
 _router = RouterAgent()
@@ -100,8 +106,31 @@ async def check_questions(state: GraphState) -> dict[str, Any]:
 
 
 async def wait_for_reply(state: GraphState) -> dict[str, Any]:
-    """Node 4: Pause execution - waiting for CEO answer via API."""
+    """Node 4: Pause execution - waiting for CEO answer via API.
+
+    Sends pending questions to the CEO via Teams and n8n.
+    """
     logger.info("Graph node: wait_for_reply (task paused)")
+
+    task_id = state.get("task_id", "")
+    questions = [
+        q for q in state.get("questions", [])
+        if q.get("status") == "pending"
+    ]
+
+    # Notify CEO via Teams (1:1 chat)
+    if questions:
+        try:
+            await _teams.send_question(task_id, questions)
+        except Exception as e:
+            logger.warning("Teams notification failed: %s", e)
+
+        # Also notify via n8n (backup channel)
+        try:
+            await _n8n.notify_question(task_id, questions)
+        except Exception as e:
+            logger.warning("n8n notification failed: %s", e)
+
     return {
         "status": TaskStatus.AWAITING_REPLY.value,
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -210,6 +239,18 @@ async def aggregate_response(state: GraphState) -> dict[str, Any]:
         department_results=dept_results,
         options=all_options,
     )
+
+    # Notify CEO via Teams with the final result
+    task_id = state.get("task_id", "")
+    try:
+        await _teams.send_result(task_id, final_response, all_options)
+    except Exception as e:
+        logger.warning("Teams result notification failed: %s", e)
+
+    try:
+        await _n8n.notify_result(task_id, final_response, all_options)
+    except Exception as e:
+        logger.warning("n8n result notification failed: %s", e)
 
     return {
         "final_response": final_response,

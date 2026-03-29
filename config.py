@@ -38,11 +38,15 @@ class Settings(BaseSettings):
     airtable_pat: str = ""
     airtable_base_id: str = ""
 
-    # Microsoft Teams / Graph API
-    teams_tenant_id: str = ""
-    teams_client_id: str = ""
-    teams_client_secret: str = ""
-    teams_webhook_url: str = ""
+    # Microsoft 365 / Graph API
+    ms365_tenant_id: str = ""
+    ms365_client_id: str = ""
+    ms365_client_secret: str = ""
+    ms365_sender_email: str = "contact@cloudmcfly.com"
+
+    # CEO contact (for 1:1 Teams chat)
+    agent_name: str = "Alexander Ruetz"
+    agent_email: str = "contact@cloudmcfly.com"
 
     # n8n
     n8n_webhook_url: str = ""
