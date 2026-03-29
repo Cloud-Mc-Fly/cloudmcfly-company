@@ -1,0 +1,1 @@
+"""CloudMcFly Company - Core module."""
